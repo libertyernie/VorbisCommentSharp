@@ -6,11 +6,10 @@ using VorbisCommentSharp;
 
 namespace Sandbox {
     class Program {
-        unsafe static void Main(string[] args) {
+        static void Main(string[] args) {
             byte[] b = File.ReadAllBytes(@"test.logg");
-            fixed (byte* start = b) {
-                byte* end = start + b.Length;
-                List<VorbisHeader> list = VorbisHeader.Search(start, end);
+            using (VorbisFile file = new VorbisFile(b)) { 
+                List<VorbisHeader> list = file.GetHeaders();
                 foreach (var h in list) {
                     Console.WriteLine(h.PacketType);
                     if (h.PacketType == 3) {
