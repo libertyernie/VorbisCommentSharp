@@ -4,14 +4,17 @@ using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace VorbisCommentSharp {
-    public class VorbisComments {
+    public unsafe class VorbisComments {
         public string Vendor { get; set; }
         public Dictionary<string, string> Comments { get; private set; }
+
+        internal byte* OrigStart { get; private set; } // inclusive
+        internal byte* OrigEnd { get; private set; } // exclusive
 
         public unsafe VorbisComments(byte* data) {
             Comments = new Dictionary<string, string>();
 
-            byte* ptr = data;
+            byte* ptr = this.OrigStart = data;
 
             uint length = *(uint*)ptr;
             ptr += 4;
@@ -34,12 +37,14 @@ namespace VorbisCommentSharp {
             }
 
             if (*ptr == 0) throw new Exception("Unexpected end of comment header");
+
+            this.OrigEnd = ptr + 1;
         }
     }
 
     public unsafe class VorbisHeader {
-        private byte* start;
-        private byte* end;
+        private byte* file_start;
+        private byte* file_end;
         private byte* header;
 
         public byte PacketType {
@@ -49,18 +54,19 @@ namespace VorbisCommentSharp {
         }
 
         public VorbisComments ExtractComments() {
+            if (PacketType != 3) throw new Exception("This is not a comment header");
             return new VorbisComments(header + 7);
         }
 
-        public VorbisHeader(byte* start, byte* end, byte* header) {
-            this.start = start;
-            this.end = end;
+        public VorbisHeader(byte* file_start, byte* file_end, byte* header) {
+            this.file_start = file_start;
+            this.file_end = file_end;
             this.header = header;
         }
 
         public VorbisHeader(VorbisFile file, byte* header) {
-            this.start = (byte*)file.Data;
-            this.end = this.start + file.Length;
+            this.file_start = (byte*)file.Data;
+            this.file_end = this.file_start + file.Length;
             this.header = header;
         }
 
@@ -70,7 +76,7 @@ namespace VorbisCommentSharp {
                 int index_in_needle = 3;
 
                 byte* ptr = header;
-                while (ptr >= start) {
+                while (ptr >= file_start) {
                     if (needle[index_in_needle] == *ptr) {
                         index_in_needle--;
                         if (index_in_needle < 0) return (OggPageHeader*)ptr;
@@ -90,7 +96,7 @@ namespace VorbisCommentSharp {
                 int index_in_needle = 0;
 
                 byte* ptr = header;
-                while (ptr < end) {
+                while (ptr < file_end) {
                     if (needle[index_in_needle] == *ptr) {
                         index_in_needle++;
                         if (index_in_needle == "OggS".Length) return (OggPageHeader*)(ptr - index_in_needle);
