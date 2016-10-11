@@ -1,19 +1,37 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
+using System.IO;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace VorbisCommentSharp {
-    public unsafe class VorbisComments {
+    public class VorbisComments {
         public string Vendor { get; set; }
         public Dictionary<string, string> Comments { get; private set; }
 
+        public VorbisComments() {
+            Comments = new Dictionary<string, string>();
+        }
+
+        public async Task Write(Stream output) {
+            byte[] vendor = Encoding.UTF8.GetBytes(this.Vendor);
+            await output.WriteAsync(BitConverter.GetBytes(vendor.Length), 0, 4);
+            await output.WriteAsync(vendor, 0, vendor.Length);
+            await output.WriteAsync(BitConverter.GetBytes(this.Comments.Count), 0, 4);
+            foreach (var p in this.Comments) {
+                byte[] comment = Encoding.UTF8.GetBytes(p.Key + "=" + p.Value);
+                await output.WriteAsync(BitConverter.GetBytes(comment.Length), 0, 4);
+                await output.WriteAsync(comment, 0, comment.Length);
+            }
+            await output.WriteAsync(new byte[] { 1 }, 0, 1);
+        }
+    }
+
+    public unsafe class VorbisCommentsFromFile : VorbisComments {
         internal byte* OrigStart { get; private set; } // inclusive
         internal byte* OrigEnd { get; private set; } // exclusive
 
-        public unsafe VorbisComments(byte* data) {
-            Comments = new Dictionary<string, string>();
-
+        public unsafe VorbisCommentsFromFile(byte* data) {
             byte* ptr = this.OrigStart = data;
 
             uint length = *(uint*)ptr;
@@ -45,7 +63,7 @@ namespace VorbisCommentSharp {
     public unsafe class VorbisHeader {
         private byte* file_start;
         private byte* file_end;
-        public byte* header { get; private set; }
+        private byte* header;
 
         public byte PacketType {
             get {
@@ -59,10 +77,10 @@ namespace VorbisCommentSharp {
             }
         }
 
-        public VorbisComments ExtractComments() {
+        public VorbisCommentsFromFile ExtractComments() {
             if (PacketType != 3) throw new Exception("This is not a comment header");
             if (VorbisTag != "vorbis") throw new Exception("This is not a Vorbis header");
-            return new VorbisComments(header + 7);
+            return new VorbisCommentsFromFile(header + 7);
         }
 
         public VorbisHeader(byte* file_start, byte* file_end, byte* header) {

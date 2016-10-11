@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 
@@ -79,6 +80,23 @@ namespace VorbisCommentSharp {
             }
             if (ptr > end) throw new Exception("Unexpected end of file");
             return list;
+        }
+
+        public VorbisFile(VorbisFile original, VorbisComments replacement) {
+            VorbisHeader commentHeader = original.GetPageHeaders().Select(p => p.GetCommentHeader()).Single(h => h != null);
+            VorbisCommentsFromFile originalComments = commentHeader.ExtractComments();
+            byte[] replacementData;
+            using (var ms = new MemoryStream()) {
+                replacement.Write(ms).Wait();
+                replacementData = ms.ToArray();
+            }
+            if (replacementData.Length + 7 >= 255) {
+                throw new Exception("Comment header is too long for this program to handle (must be under 248 bytes)");
+            }
+            long length = this.Length
+                - (originalComments.OrigEnd - originalComments.OrigStart)
+                + replacementData.Length;
+            throw new NotImplementedException();
         }
 
         #region IDisposable Support
