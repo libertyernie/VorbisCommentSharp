@@ -53,8 +53,15 @@ namespace VorbisCommentSharp {
             }
         }
 
+        public string VorbisTag {
+            get {
+                return new string((sbyte*)header + 1, 0, 6);
+            }
+        }
+
         public VorbisComments ExtractComments() {
             if (PacketType != 3) throw new Exception("This is not a comment header");
+            if (VorbisTag != "vorbis") throw new Exception("This is not a Vorbis header");
             return new VorbisComments(header + 7);
         }
 
