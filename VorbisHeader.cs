@@ -45,7 +45,7 @@ namespace VorbisCommentSharp {
     public unsafe class VorbisHeader {
         private byte* file_start;
         private byte* file_end;
-        private byte* header;
+        public byte* header { get; private set; }
 
         public byte PacketType {
             get {
@@ -70,7 +70,7 @@ namespace VorbisCommentSharp {
             this.header = header;
         }
 
-        unsafe OggPageHeader* PreviousOggPageHeader {
+        public unsafe OggPageHeader* PreviousOggPageHeader {
             get {
                 char[] needle = "OggS".ToArray();
                 int index_in_needle = 3;
@@ -80,6 +80,7 @@ namespace VorbisCommentSharp {
                     if (needle[index_in_needle] == *ptr) {
                         index_in_needle--;
                         if (index_in_needle < 0) return (OggPageHeader*)ptr;
+                        ptr--;
                     } else if (index_in_needle < 3) {
                         index_in_needle = 3;
                     } else {
@@ -90,7 +91,7 @@ namespace VorbisCommentSharp {
             }
         }
 
-        unsafe OggPageHeader* NextOggPageHeader {
+        public unsafe OggPageHeader* NextOggPageHeader {
             get {
                 char[] needle = "OggS".ToArray();
                 int index_in_needle = 0;
@@ -100,6 +101,7 @@ namespace VorbisCommentSharp {
                     if (needle[index_in_needle] == *ptr) {
                         index_in_needle++;
                         if (index_in_needle == "OggS".Length) return (OggPageHeader*)(ptr - index_in_needle);
+                        ptr++;
                     } else if (index_in_needle > 0) {
                         index_in_needle = 0;
                     } else {
