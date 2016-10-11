@@ -76,47 +76,5 @@ namespace VorbisCommentSharp {
             this.file_end = this.file_start + file.Length;
             this.header = header;
         }
-
-        public unsafe OggPageHeader* PreviousOggPageHeader {
-            get {
-                char[] needle = "OggS".ToArray();
-                int index_in_needle = 3;
-
-                byte* ptr = header;
-                while (ptr >= file_start) {
-                    if (needle[index_in_needle] == *ptr) {
-                        index_in_needle--;
-                        if (index_in_needle < 0) return (OggPageHeader*)ptr;
-                        ptr--;
-                    } else if (index_in_needle < 3) {
-                        index_in_needle = 3;
-                    } else {
-                        ptr--;
-                    }
-                }
-                throw new Exception("OggS not found");
-            }
-        }
-
-        public unsafe OggPageHeader* NextOggPageHeader {
-            get {
-                char[] needle = "OggS".ToArray();
-                int index_in_needle = 0;
-
-                byte* ptr = header;
-                while (ptr < file_end) {
-                    if (needle[index_in_needle] == *ptr) {
-                        index_in_needle++;
-                        if (index_in_needle == "OggS".Length) return (OggPageHeader*)(ptr - index_in_needle);
-                        ptr++;
-                    } else if (index_in_needle > 0) {
-                        index_in_needle = 0;
-                    } else {
-                        ptr++;
-                    }
-                }
-                throw new Exception("OggS not found");
-            }
-        }
     }
 }

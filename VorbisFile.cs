@@ -22,31 +22,6 @@ namespace VorbisCommentSharp {
         public uint Checksum;
         [FieldOffset(26)]
         public byte PageSegments;
-
-        /*public unsafe byte[] PageSegmentLengths {
-            get {
-                fixed (OggPageHeader* ptr = &this) {
-                    byte* table = (byte*)(ptr + 1);
-                    byte[] arr = new byte[PageSegments];
-                    for (int i=0; i<PageSegments; i++) {
-                        arr[i] = table[i];
-                    }
-                    return arr;
-                }
-            }
-        }
-
-        public unsafe byte* GetSegmentPointer(int index) {
-            if (index >= PageSegments) throw new IndexOutOfRangeException();
-            fixed (OggPageHeader* ptr = &this) {
-                byte* table = (byte*)(ptr + 1);
-                byte* header = table + PageSegments;
-                for (int i=0; i<index; i++) {
-                    header += table[i];
-                }
-                return header;
-            }
-        }*/
     }
 
     public unsafe class OggPage {
@@ -82,62 +57,27 @@ namespace VorbisCommentSharp {
             Marshal.Copy(data, 0, this.Data, this.Length);
         }
 
-        public List<VorbisHeader> GetHeaders() {
-            char[] needle = "vorbis".ToArray();
-            int index_in_needle = 0;
-            List<VorbisHeader> list = new List<VorbisHeader>();
-
-            byte* ptr = (byte*)Data;
-            byte* end = ptr + Length;
-            while (ptr < end) {
-                if (needle[index_in_needle] == *ptr) {
-                    index_in_needle++;
-                    if (index_in_needle == "vorbis".Length) {
-                        list.Add(new VorbisHeader(this, ptr - index_in_needle));
-                        index_in_needle = 0;
-                    }
-                    ptr++;
-                } else if (index_in_needle > 0) {
-                    index_in_needle = 0;
-                } else {
-                    ptr++;
-                }
-            }
-            return list;
-        }
-
         public unsafe List<OggPage> GetPageHeaders() {
-            char[] needle = "OggS".ToArray();
-            int index_in_needle = 0;
             List<OggPage> list = new List<OggPage>();
-
             byte* ptr = (byte*)Data;
             byte* end = ptr + Length;
             while (ptr < end) {
-                if (needle[index_in_needle] == *ptr) {
-                    index_in_needle++;
-                    ptr++;
-                    if (index_in_needle == "OggS".Length) {
-                        OggPageHeader* pageHeader = (OggPageHeader*)(ptr - index_in_needle);
-                        if (pageHeader->CapturePattern != 0x5367674f) throw new Exception();
-                        list.Add(new OggPage() {
-                            Header = pageHeader,
-                            Parent = this
-                        });
-                        index_in_needle = 0;
+                string capturePattern = new string((sbyte*)ptr, 0, 4);
+                if (capturePattern != "OggS") throw new Exception("OggS expected, but not found");
 
-                        byte* segmentTable = (byte*)(pageHeader + 1);
-                        ptr = segmentTable + pageHeader->PageSegments;
-                        for (int i = 0; i < pageHeader->PageSegments; i++) {
-                            ptr += segmentTable[i];
-                        }
-                    }
-                } else if (index_in_needle > 0) {
-                    index_in_needle = 0;
-                } else {
-                    ptr++;
+                OggPageHeader* pageHeader = (OggPageHeader*)ptr;
+                list.Add(new OggPage() {
+                    Header = pageHeader,
+                    Parent = this
+                });
+
+                byte* segmentTable = (byte*)(pageHeader + 1);
+                ptr = segmentTable + pageHeader->PageSegments;
+                for (int i = 0; i < pageHeader->PageSegments; i++) {
+                    ptr += segmentTable[i];
                 }
             }
+            if (ptr > end) throw new Exception("Unexpected end of file");
             return list;
         }
 
