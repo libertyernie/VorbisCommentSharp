@@ -37,7 +37,7 @@ namespace VorbisCommentSharp {
             for (int i=0; i<Header->PageSegments; i++) {
                 // Don't check a segment if its length is greater than 254 bytes (data is probably split across segments)
                 if (table[i] < 255) {
-                    VorbisHeader test = new VorbisHeader(this.Parent, header);
+                    VorbisHeader test = new VorbisHeader(this, &table[i], header);
                     if (test.PacketType == 3 && test.VorbisTag == "vorbis") {
                         return test;
                     }
@@ -45,6 +45,18 @@ namespace VorbisCommentSharp {
                 header += table[i];
             }
             return null;
+        }
+
+        public void RecalculateCrc32() {
+            Header->Checksum = 0;
+
+            byte* table = (byte*)(Header + 1);
+            int bodyLength = 0;
+            for (int i=0; i<Header->PageSegments; i++) {
+                bodyLength += table[i];
+            }
+            uint x = UnsafeOggCRC.GetChecksum((byte*)Header, sizeof(OggPageHeader) + Header->PageSegments + bodyLength);
+            Header->Checksum = x;
         }
     }
 
@@ -56,6 +68,57 @@ namespace VorbisCommentSharp {
             this.Data = Marshal.AllocHGlobal(data.Length);
             this.Length = data.Length;
             Marshal.Copy(data, 0, this.Data, this.Length);
+        }
+
+        public VorbisFile(VorbisFile original, VorbisComments replacement) {
+            // Extract comments from original file
+            VorbisHeader commentHeader = original.GetPageHeaders().Select(p => p.GetCommentHeader()).Single(h => h != null);
+            VorbisCommentsFromFile originalComments = commentHeader.ExtractComments();
+
+            // Get new comments header into byte array
+            byte[] replacementData;
+            using (var ms = new MemoryStream()) {
+                replacement.WriteTo(ms);
+                replacementData = ms.ToArray();
+            }
+            if (replacementData.Length + 7 >= 255) {
+                throw new Exception("Comment header is too long for this program to handle (must be under 248 bytes)");
+            }
+
+            // Calculate new filesize and allocate memory
+            this.Length = original.Length
+                - (int)(originalComments.OrigEnd - originalComments.OrigStart)
+                + replacementData.Length;
+            this.Data = Marshal.AllocHGlobal(this.Length);
+
+            // Copy section before comment header
+            byte* sourcePtr = (byte*)original.Data;
+            byte* endPtr = sourcePtr + original.Length;
+            byte* destinationPtr = (byte*)this.Data;
+            while (sourcePtr < originalComments.OrigStart) {
+                *destinationPtr++ = *sourcePtr++;
+            }
+
+            // Copy new comment header
+            Marshal.Copy(replacementData, 0, (IntPtr)destinationPtr, replacementData.Length);
+            destinationPtr += replacementData.Length;
+
+            // Copy section after comment header
+            sourcePtr = originalComments.OrigEnd;
+            while (sourcePtr < endPtr) {
+                *destinationPtr++ = *sourcePtr++;
+            }
+
+            if (destinationPtr - this.Length != (byte*)this.Data) throw new Exception("not enough data written");
+
+            // Update length of segment containing comments
+            byte* comment_header_segment_table_entry = (byte*)this.Data + (commentHeader.segment_table_entry - (byte*)original.Data);
+            *comment_header_segment_table_entry = (byte)(replacementData.Length + 7);
+            
+            // Recalculate all checksums
+            foreach (OggPage page in GetPageHeaders()) {
+                page.RecalculateCrc32();
+            }
         }
 
         public unsafe List<OggPage> GetPageHeaders() {
@@ -82,21 +145,10 @@ namespace VorbisCommentSharp {
             return list;
         }
 
-        public VorbisFile(VorbisFile original, VorbisComments replacement) {
-            VorbisHeader commentHeader = original.GetPageHeaders().Select(p => p.GetCommentHeader()).Single(h => h != null);
-            VorbisCommentsFromFile originalComments = commentHeader.ExtractComments();
-            byte[] replacementData;
-            using (var ms = new MemoryStream()) {
-                replacement.Write(ms).Wait();
-                replacementData = ms.ToArray();
-            }
-            if (replacementData.Length + 7 >= 255) {
-                throw new Exception("Comment header is too long for this program to handle (must be under 248 bytes)");
-            }
-            long length = this.Length
-                - (originalComments.OrigEnd - originalComments.OrigStart)
-                + replacementData.Length;
-            throw new NotImplementedException();
+        public byte[] ToByteArray() {
+            byte[] arr = new byte[this.Length];
+            Marshal.Copy(this.Data, arr, 0, this.Length);
+            return arr;
         }
 
         #region IDisposable Support

@@ -6,7 +6,7 @@ using VorbisCommentSharp;
 
 namespace Sandbox {
     class Program {
-        static unsafe void Main(string[] args) {
+        static void Main(string[] args) {
             byte[] b = File.ReadAllBytes(@"test.logg");
             using (VorbisFile file = new VorbisFile(b)) { 
                 List<OggPage> list = file.GetPageHeaders();
@@ -19,11 +19,11 @@ namespace Sandbox {
                         Console.WriteLine(c.Vendor);
                         Console.WriteLine(string.Join(", ", c.Comments.Select(p => p.Key + ": " + p.Value)));
 
-                        MemoryStream ms = new MemoryStream();
-                        var t = c.Write(ms);
-                        Console.WriteLine(ms.ToArray().Length);
-                        t.Wait();
-                        Console.WriteLine(ms.ToArray().Length);
+                        //c.Comments["LOOPSTART"] = "100000";
+                        //c.Comments["LOOPLENGTH"] = "150000";
+
+                        VorbisFile newFile = new VorbisFile(file, c);
+                        File.WriteAllBytes("out.logg", newFile.ToByteArray());
                     }
                 }
             }

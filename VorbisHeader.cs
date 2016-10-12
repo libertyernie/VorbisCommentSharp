@@ -13,17 +13,17 @@ namespace VorbisCommentSharp {
             Comments = new Dictionary<string, string>();
         }
 
-        public async Task Write(Stream output) {
+        public void WriteTo(Stream output) {
             byte[] vendor = Encoding.UTF8.GetBytes(this.Vendor);
-            await output.WriteAsync(BitConverter.GetBytes(vendor.Length), 0, 4);
-            await output.WriteAsync(vendor, 0, vendor.Length);
-            await output.WriteAsync(BitConverter.GetBytes(this.Comments.Count), 0, 4);
+            output.Write(BitConverter.GetBytes(vendor.Length), 0, 4);
+            output.Write(vendor, 0, vendor.Length);
+            output.Write(BitConverter.GetBytes(this.Comments.Count), 0, 4);
             foreach (var p in this.Comments) {
                 byte[] comment = Encoding.UTF8.GetBytes(p.Key + "=" + p.Value);
-                await output.WriteAsync(BitConverter.GetBytes(comment.Length), 0, 4);
-                await output.WriteAsync(comment, 0, comment.Length);
+                output.Write(BitConverter.GetBytes(comment.Length), 0, 4);
+                output.Write(comment, 0, comment.Length);
             }
-            await output.WriteAsync(new byte[] { 1 }, 0, 1);
+            output.Write(new byte[] { 1 }, 0, 1);
         }
     }
 
@@ -61,8 +61,11 @@ namespace VorbisCommentSharp {
     }
 
     public unsafe class VorbisHeader {
+        public OggPage Parent { get; private set; }
+
         private byte* file_start;
         private byte* file_end;
+        internal byte* segment_table_entry { get; private set; }
         private byte* header;
 
         public byte PacketType {
@@ -77,22 +80,17 @@ namespace VorbisCommentSharp {
             }
         }
 
+        public VorbisHeader(OggPage parent, byte* segment_table_entry, byte* header) {
+            this.file_start = (byte*)parent.Parent.Data;
+            this.file_end = this.file_start + parent.Parent.Length;
+            this.segment_table_entry = segment_table_entry;
+            this.header = header;
+        }
+
         public VorbisCommentsFromFile ExtractComments() {
             if (PacketType != 3) throw new Exception("This is not a comment header");
             if (VorbisTag != "vorbis") throw new Exception("This is not a Vorbis header");
             return new VorbisCommentsFromFile(header + 7);
-        }
-
-        public VorbisHeader(byte* file_start, byte* file_end, byte* header) {
-            this.file_start = file_start;
-            this.file_end = file_end;
-            this.header = header;
-        }
-
-        public VorbisHeader(VorbisFile file, byte* header) {
-            this.file_start = (byte*)file.Data;
-            this.file_end = this.file_start + file.Length;
-            this.header = header;
         }
     }
 }
