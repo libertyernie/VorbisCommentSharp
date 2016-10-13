@@ -26,10 +26,13 @@ namespace VorbisCommentSharp {
     }
 
     public unsafe class OggPage {
-        public VorbisFile Parent { get; internal set; }
-        internal OggPageHeader* Header { get; set; }
+        public VorbisFile Parent { get; private set; }
+        internal OggPageHeader* Header { get; private set; }
 
-        internal OggPage() { }
+        internal OggPage(VorbisFile parent, OggPageHeader* header) {
+            this.Parent = parent;
+            this.Header = header;
+        }
 
         public unsafe VorbisHeader GetCommentHeader() {
             byte* table = (byte*)(Header + 1);
@@ -60,7 +63,7 @@ namespace VorbisCommentSharp {
         }
     }
 
-    public unsafe sealed class VorbisFile : IDisposable {
+    public unsafe class VorbisFile : IDisposable {
         internal IntPtr Data { get; private set; }
         internal int Length { get; private set; }
 
@@ -130,10 +133,7 @@ namespace VorbisCommentSharp {
                 if (capturePattern != "OggS") throw new Exception("OggS expected, but not found");
 
                 OggPageHeader* pageHeader = (OggPageHeader*)ptr;
-                list.Add(new OggPage() {
-                    Header = pageHeader,
-                    Parent = this
-                });
+                list.Add(new OggPage(this, pageHeader));
 
                 byte* segmentTable = (byte*)(pageHeader + 1);
                 ptr = segmentTable + pageHeader->PageSegments;

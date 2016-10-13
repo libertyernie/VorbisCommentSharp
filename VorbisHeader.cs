@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace VorbisCommentSharp {
     public class VorbisComments {
@@ -62,9 +61,7 @@ namespace VorbisCommentSharp {
 
     public unsafe class VorbisHeader {
         public OggPage Parent { get; private set; }
-
-        private byte* file_start;
-        private byte* file_end;
+        
         internal byte* segment_table_entry { get; private set; }
         private byte* header;
 
@@ -81,8 +78,6 @@ namespace VorbisCommentSharp {
         }
 
         public VorbisHeader(OggPage parent, byte* segment_table_entry, byte* header) {
-            this.file_start = (byte*)parent.Parent.Data;
-            this.file_end = this.file_start + parent.Parent.Length;
             this.segment_table_entry = segment_table_entry;
             this.header = header;
         }
