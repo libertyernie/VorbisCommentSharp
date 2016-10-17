@@ -35,7 +35,7 @@ namespace VorbisCommentSharp {
         }
 
         public unsafe VorbisHeader GetCommentHeader() {
-            byte* table = (byte*)(Header + 1);
+            byte* table = (byte*)Header + 27;
             byte* header = table + Header->PageSegments;
             for (int i=0; i<Header->PageSegments; i++) {
                 // Don't check a segment if its length is greater than 254 bytes (data is probably split across segments)
@@ -53,7 +53,7 @@ namespace VorbisCommentSharp {
         public void RecalculateCrc32() {
             Header->Checksum = 0;
 
-            byte* table = (byte*)(Header + 1);
+            byte* table = (byte*)Header + 27;
             int bodyLength = 0;
             for (int i=0; i<Header->PageSegments; i++) {
                 bodyLength += table[i];
@@ -135,7 +135,7 @@ namespace VorbisCommentSharp {
                 OggPageHeader* pageHeader = (OggPageHeader*)ptr;
                 list.Add(new OggPage(this, pageHeader));
 
-                byte* segmentTable = (byte*)(pageHeader + 1);
+                byte* segmentTable = (byte*)pageHeader + 27;
                 ptr = segmentTable + pageHeader->PageSegments;
                 for (int i = 0; i < pageHeader->PageSegments; i++) {
                     ptr += segmentTable[i];
